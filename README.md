@@ -93,3 +93,7 @@ Happy hacking 😁!
 
 ## Thought process
 - The first step is to focus on the BillingService, ignoring the scheduling part.
+- Once the basic implementation is done, it is needed to define how to deal with possible errors:
+  - For NetworkException, the logical step is to retry for a few times and desist after it
+  - For CurrencyMismatchException, since is an error that can be fixed by the customer, it could be sent an email and retry the next day
+  - For CustomerNotFoundException, since there is no possible fix or customer to contact, it should be sent to a different table so another team can deal with those invocies.

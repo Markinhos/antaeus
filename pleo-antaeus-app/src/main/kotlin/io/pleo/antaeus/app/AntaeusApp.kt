@@ -8,6 +8,7 @@
 package io.pleo.antaeus.app
 
 import getPaymentProvider
+import io.pleo.antaeus.core.resilience.getRetryRegistry
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
 import io.pleo.antaeus.core.services.InvoiceService
@@ -60,8 +61,15 @@ fun main() {
     val invoiceService = InvoiceService(dal = dal)
     val customerService = CustomerService(dal = dal)
 
+    // Get retry registry
+    val registry = getRetryRegistry()
+
     // This is _your_ billing service to be included where you see fit
-    val billingService = BillingService(paymentProvider = paymentProvider)
+    val billingService = BillingService(
+        retry = registry.retry("payment-retry"),
+        paymentProvider = paymentProvider,
+        invoiceService = invoiceService
+    )
 
     // Create REST web service
     AntaeusRest(
