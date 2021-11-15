@@ -18,4 +18,6 @@ object InvoiceTable : Table() {
 object CustomerTable : Table() {
     val id = integer("id").autoIncrement().primaryKey()
     val currency = varchar("currency", 3)
+    val email = varchar("email", 100)
+    val name = varchar("name", 100)
 }

@@ -1,4 +1,5 @@
 
+import io.pleo.antaeus.core.external.EmailProvider
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
@@ -35,6 +36,14 @@ internal fun getPaymentProvider(): PaymentProvider {
     return object : PaymentProvider {
         override fun charge(invoice: Invoice): Boolean {
                 return Random.nextBoolean()
+        }
+    }
+}
+
+// This is the mocked instance of the email provider
+internal fun getEmailProvider(): EmailProvider {
+    return object : EmailProvider {
+        override fun emailCustomer(address: String, content: String) {
         }
     }
 }

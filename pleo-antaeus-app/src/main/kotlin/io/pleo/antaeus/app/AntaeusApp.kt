@@ -7,10 +7,12 @@
 
 package io.pleo.antaeus.app
 
+import getEmailProvider
 import getPaymentProvider
 import io.pleo.antaeus.core.resilience.getRetryRegistry
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerService
+import io.pleo.antaeus.core.services.EmailService
 import io.pleo.antaeus.core.services.InvoiceService
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.data.CustomerTable
@@ -56,10 +58,13 @@ fun main() {
 
     // Get third parties
     val paymentProvider = getPaymentProvider()
+    val emailProvider = getEmailProvider()
+
 
     // Create core services
     val invoiceService = InvoiceService(dal = dal)
     val customerService = CustomerService(dal = dal)
+    val emailService = EmailService(emailProvider = emailProvider, customerService = customerService)
 
     // Get retry registry
     val registry = getRetryRegistry()
@@ -68,7 +73,8 @@ fun main() {
     val billingService = BillingService(
         retry = registry.retry("payment-retry"),
         paymentProvider = paymentProvider,
-        invoiceService = invoiceService
+        invoiceService = invoiceService,
+        emailService = emailService
     )
 
     // Create REST web service

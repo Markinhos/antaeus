@@ -4,6 +4,7 @@ import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.kotlin
 
 const val junitVersion = "5.6.0"
+const val resilience4jVersion = "1.7.0"
 
 /**
  * Configures the current project as a Kotlin project by adding the Kotlin `stdlib` as a dependency.
@@ -18,12 +19,15 @@ fun Project.kotlinProject() {
         "implementation"("io.github.microutils:kotlin-logging:1.7.8")
 
         // Mockk
-        "testImplementation"("io.mockk:mockk:1.9.3")
+        "testImplementation"("io.mockk:mockk:1.12.0")
 
         // JUnit 5
         "testImplementation"("org.junit.jupiter:junit-jupiter-api:$junitVersion")
         "testImplementation"("org.junit.jupiter:junit-jupiter-params:$junitVersion")
         "runtime"("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
+
+        "testImplementation"("org.assertj:assertj-core:3.11.1")
+        "compile"("io.github.resilience4j:resilience4j-retry:${resilience4jVersion}")
     }
 }
 
