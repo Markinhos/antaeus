@@ -10,6 +10,11 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * Billing service class provides two public methods: billClients() and retryFailedInvoices(). The former is used
+ * for billing pending invoices every first day of the month. That latter is used to retry every day failed invoices that
+ * are considered to be retryable.
+ */
 class BillingService(
     private val retry: Retry,
     private val paymentProvider: PaymentProvider,
@@ -18,12 +23,18 @@ class BillingService(
     private val customerOperationsService: CustomerOperationsService
 ) {
 
+    /**
+     * Bills pending invoices
+     */
     fun billClients() {
         invoiceService.fetchPendingInvoices().forEach {
             billInvoice(it)
         }
     }
 
+    /**
+     * Bills retryable invoices
+     */
     fun retryFailedInvoices() {
         invoiceService.fetchRetryableInvoices().forEach {
             billInvoice(it)
@@ -36,7 +47,6 @@ class BillingService(
                 paymentProvider.charge(invoice)
             }
             invoiceService.update(invoice.id, invoice.amount, invoice.customerId, InvoiceStatus.PAID)
-
             logger.info { "Customer charged with $invoice" }
         } catch (currencyMismatchException: CurrencyMismatchException) {
             logger.warn { "Failed to charge invoice $invoice due to currency mismatch" }
