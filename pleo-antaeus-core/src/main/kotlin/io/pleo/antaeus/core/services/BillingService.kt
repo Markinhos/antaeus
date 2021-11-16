@@ -6,7 +6,9 @@ import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
+import mu.KotlinLogging
 
+private val logger = KotlinLogging.logger {}
 
 class BillingService(
     private val retry: Retry,
@@ -28,18 +30,25 @@ class BillingService(
         }
     }
 
-    private fun billInvoice(it: Invoice) {
+    private fun billInvoice(invoice: Invoice) {
         try {
             retry.executeSupplier {
-                paymentProvider.charge(it)
+                paymentProvider.charge(invoice)
             }
-            invoiceService.update(it.id, it.amount, it.customerId, InvoiceStatus.PAID)
+            invoiceService.update(invoice.id, invoice.amount, invoice.customerId, InvoiceStatus.PAID)
+
+            logger.info { "Customer charged with $invoice" }
         } catch (currencyMismatchException: CurrencyMismatchException) {
-            emailService.emailCurrencyMismatch(it.customerId, it)
-            invoiceService.update(it.id, it.amount, it.customerId, InvoiceStatus.RETRYABLE_FAILED)
+            logger.warn { "Failed to charge invoice $invoice due to currency mismatch" }
+            emailService.emailCurrencyMismatch(invoice.customerId, invoice)
+            invoiceService.update(invoice.id, invoice.amount, invoice.customerId, InvoiceStatus.RETRYABLE_FAILED)
         } catch (customerNotFoundException: CustomerNotFoundException) {
-            customerOperationsService.createTicketToOperationsForCustomerNotFound(it.id)
-            invoiceService.update(it.id, it.amount, it.customerId, InvoiceStatus.FAILED)
+            logger.warn { "Failed to charge invoice $invoice due to customer not found" }
+            customerOperationsService.createTicketToOperationsForCustomerNotFound(invoice.id)
+            invoiceService.update(invoice.id, invoice.amount, invoice.customerId, InvoiceStatus.FAILED)
+        } catch (throwable: Throwable) {
+            logger.error { "Failed to charge invoice $invoice due to $throwable" }
+            invoiceService.update(invoice.id, invoice.amount, invoice.customerId, InvoiceStatus.RETRYABLE_FAILED)
         }
     }
 }
