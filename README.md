@@ -98,3 +98,14 @@ Happy hacking 😁!
   - For CurrencyMismatchException, since is an error that can be fixed by the customer, it could be sent an email and retry the next day
   - For CustomerNotFoundException, since there is no possible fix or customer to contact, it should be sent to a different table so another team can deal with those invoices.
 - Next step is just to retrieve the invoices that we are interested instead of fetching all and filtering in memory.
+- Add scheduling job. It runs every day, and checks if it is the first day of the month and if it is charge pending invoices. Otherwise, try to charge retryable invoices.
+
+- From this point on the basic functionality is done. There are many improvements that it could be done:
+  - Add a retry to every external service
+  - Add more security patterns to external services (CircuitBreaker, RateLimiter, etc.)
+  - Paginate calls to database
+  - Set a retry counter per retryable invoice, and if reached send to customer operations.
+  - Set a configurable option when to bill customers.
+  - In a real production environment many of the external calls could be done in a more async way, making use of queues systems like SQS. This could be applied to email service for instance as no result is used and no sync call is needed.
+
+This took me about 3-4 h
