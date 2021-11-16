@@ -7,9 +7,9 @@
 
 package io.pleo.antaeus.app
 
-import getTicketingProvider
 import getEmailProvider
 import getPaymentProvider
+import getTicketingProvider
 import io.pleo.antaeus.core.resilience.getRetryRegistry
 import io.pleo.antaeus.core.services.BillingService
 import io.pleo.antaeus.core.services.CustomerOperationsService
@@ -29,6 +29,10 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import setupInitialData
 import java.io.File
 import java.sql.Connection
+import java.util.Calendar
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
 
 fun main() {
     // The tables to create in the database.
@@ -82,9 +86,24 @@ fun main() {
         customerOperationsService = customerOperationsService
     )
 
+    // Schedule billing
+    val scheduler = Executors.newScheduledThreadPool(1)
+    scheduler.scheduleAtFixedRate({
+        val cal = Calendar.getInstance()
+        val dayOfMonth = cal[Calendar.DAY_OF_MONTH]
+        if (dayOfMonth == 1) {
+            // If is the first day of the month schedule pending payments
+            billingService.billClients()
+        } else {
+            // Otherwise, retry failed invoices
+            billingService.retryFailedInvoices()
+        }
+    }, 0, 1, TimeUnit.DAYS)
+
     // Create REST web service
     AntaeusRest(
         invoiceService = invoiceService,
-        customerService = customerService
+        customerService = customerService,
+        billingService = billingService
     ).run()
 }

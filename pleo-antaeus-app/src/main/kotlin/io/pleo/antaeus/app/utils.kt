@@ -1,4 +1,7 @@
 
+import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
+import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
+import io.pleo.antaeus.core.exceptions.NetworkException
 import io.pleo.antaeus.core.external.TicketingProvider
 import io.pleo.antaeus.core.external.EmailProvider
 import io.pleo.antaeus.core.external.PaymentProvider
@@ -14,8 +17,11 @@ import kotlin.random.Random
 // This will create all schemas and setup initial data
 internal fun setupInitialData(dal: AntaeusDal) {
     val customers = (1..100).mapNotNull {
+        val name = getRandomString(10)
         dal.createCustomer(
-            currency = Currency.values()[Random.nextInt(0, Currency.values().size)]
+            currency = Currency.values()[Random.nextInt(0, Currency.values().size)],
+            email = "$name@pleo.io",
+            name = name
         )
     }
 
@@ -33,11 +39,24 @@ internal fun setupInitialData(dal: AntaeusDal) {
     }
 }
 
+private fun getRandomString(length: Int) : String {
+    val allowedChars = ('A'..'Z') + ('a'..'z') + ('0'..'9')
+    return (1..length)
+        .map { allowedChars.random() }
+        .joinToString("")
+}
+
 // This is the mocked instance of the payment provider
 internal fun getPaymentProvider(): PaymentProvider {
     return object : PaymentProvider {
         override fun charge(invoice: Invoice): Boolean {
-                return Random.nextBoolean()
+            when(Random.nextInt(4)) {
+                0 -> throw NetworkException()
+                1 -> throw CurrencyMismatchException(invoice.id, invoice.customerId)
+                2 -> throw CustomerNotFoundException(invoice.id)
+                else -> return Random.nextBoolean()
+            }
+
         }
     }
 }

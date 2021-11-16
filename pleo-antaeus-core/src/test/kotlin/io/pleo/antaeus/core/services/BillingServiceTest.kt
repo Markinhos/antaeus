@@ -119,12 +119,11 @@ internal class BillingServiceTest {
     @Test
     fun `given a list of invoices when calling payments fail with a network exception expect to retry`() {
 
-        val invoice = mockk<Invoice>()
         val money = Money(BigDecimal.valueOf(100), Currency.USD)
-        val secondInvoice = Invoice(2, 1, money, InvoiceStatus.PENDING)
+        val invoice = Invoice(2, 1, money, InvoiceStatus.PENDING)
 
-        every { invoiceService.fetchPendingInvoices() } returns listOf(secondInvoice)
-        every { paymentProvider.charge(secondInvoice) } throws NetworkException() andThen true
+        every { invoiceService.fetchPendingInvoices() } returns listOf(invoice)
+        every { paymentProvider.charge(invoice) } throws NetworkException() andThen true
         every { invoiceService.update(2, money, 1, InvoiceStatus.PAID) } returns invoice
 
         val config = RetryConfig.custom<Any>()
@@ -137,7 +136,34 @@ internal class BillingServiceTest {
 
         billingService.billClients()
 
-        verify(exactly = 2) { paymentProvider.charge(secondInvoice) }
+        verify(exactly = 2) { paymentProvider.charge(invoice) }
+        verify { invoiceService.update(invoice.id, invoice.amount, invoice.customerId, InvoiceStatus.PAID) }
+
+    }
+
+    @Test
+    fun `given a list of invoices when calling payments fail more than three times with a network exception expect to fail and update invoice`() {
+
+        val money = Money(BigDecimal.valueOf(100), Currency.USD)
+        val invoice = Invoice(2, 1, money, InvoiceStatus.PENDING)
+
+        every { invoiceService.fetchPendingInvoices() } returns listOf(invoice)
+        every { paymentProvider.charge(invoice) } throws NetworkException()
+        every { invoiceService.update(2, money, 1, InvoiceStatus.RETRYABLE_FAILED) } returns invoice
+
+        val config = RetryConfig.custom<Any>()
+            .maxAttempts(3)
+            .retryExceptions(NetworkException::class.java)
+            .ignoreExceptions(CurrencyMismatchException::class.java, CustomerNotFoundException::class.java)
+            .build()
+
+        val billingService = BillingService(RetryRegistry.of(config).retry("mock"),paymentProvider, invoiceService, emailService, customerOperationsService)
+
+        billingService.billClients()
+
+        verify(exactly = 3) { paymentProvider.charge(invoice) }
+        verify { invoiceService.update(invoice.id, invoice.amount, invoice.customerId, InvoiceStatus.RETRYABLE_FAILED) }
+
     }
 
 }
