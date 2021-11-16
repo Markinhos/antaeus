@@ -14,6 +14,7 @@ import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.core.services.BillingService
+import io.pleo.antaeus.core.services.CustomerOperationsService
 import io.pleo.antaeus.core.services.EmailService
 import io.pleo.antaeus.core.services.InvoiceService
 import io.pleo.antaeus.models.Currency
@@ -31,6 +32,7 @@ internal class BillingServiceTest {
     private val invoiceService = mockk<InvoiceService>()
     private val emailService = mockk<EmailService>()
     private val retry = mockk<Retry>()
+    private val customerOperationsService = mockk<CustomerOperationsService>()
 
     @BeforeEach
     fun setUp() {
@@ -49,7 +51,7 @@ internal class BillingServiceTest {
         every { paymentProvider.charge(firstInvoice) } returns true
         every { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.PAID) } returns mockk()
 
-        val billingService = BillingService(retry, paymentProvider, invoiceService, emailService)
+        val billingService = BillingService(retry, paymentProvider, invoiceService, emailService, customerOperationsService)
         billingService.billClients()
 
         verify { paymentProvider.charge(firstInvoice) }
@@ -59,14 +61,14 @@ internal class BillingServiceTest {
 
     @Test
     fun `given a list of invoices failed it should charge every invoice failed`() {
-        val firstInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.CUSTOMER_FAILED)
+        val firstInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.RETRYABLE_FAILED)
         val secondInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.PAID)
 
         every { invoiceService.fetchAll() } returns listOf(firstInvoice, secondInvoice)
         every { paymentProvider.charge(firstInvoice) } returns true
         every { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.PAID) } returns mockk()
 
-        val billingService = BillingService(retry, paymentProvider, invoiceService, emailService)
+        val billingService = BillingService(retry, paymentProvider, invoiceService, emailService, customerOperationsService)
         billingService.retryFailedInvoices()
 
         verify { paymentProvider.charge(firstInvoice) }
@@ -75,22 +77,43 @@ internal class BillingServiceTest {
     }
 
     @Test
-    fun `given a list of invoices when calling payments fail when currency mismatch expect to update invoice and call email service`() {
+    fun `given a list of invoices when calling payments fail with currency mismatch expect to update invoice and call email service`() {
 
         val firstInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.PENDING)
         val money = Money(BigDecimal.valueOf(100), Currency.USD)
 
         every { paymentProvider.charge(firstInvoice) } throws CurrencyMismatchException(firstInvoice.id, firstInvoice.customerId)
-        every { invoiceService.update(firstInvoice.id, money, firstInvoice.id, InvoiceStatus.CUSTOMER_FAILED) } returns mockk()
+        every { invoiceService.update(firstInvoice.id, money, firstInvoice.id, InvoiceStatus.RETRYABLE_FAILED) } returns mockk()
         every { emailService.emailCurrencyMismatch(firstInvoice.customerId, firstInvoice) } just Runs
         every { invoiceService.fetchAll() } returns listOf(firstInvoice)
 
-        val billingService = BillingService(retry, paymentProvider, invoiceService, emailService)
+        val billingService = BillingService(retry, paymentProvider, invoiceService, emailService, customerOperationsService)
 
         billingService.billClients()
 
         verify { paymentProvider.charge(firstInvoice) }
-        verify { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.CUSTOMER_FAILED) }
+        verify { emailService.emailCurrencyMismatch(firstInvoice.customerId, firstInvoice) }
+        verify { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.RETRYABLE_FAILED) }
+    }
+
+    @Test
+    fun `given a list of invoices when calling payments fail with CustomerNotFoundException expect to update invoice and call customer operations service`() {
+
+        val firstInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.PENDING)
+        val money = Money(BigDecimal.valueOf(100), Currency.USD)
+
+        every { paymentProvider.charge(firstInvoice) } throws CustomerNotFoundException(firstInvoice.customerId)
+        every { invoiceService.update(firstInvoice.id, money, firstInvoice.id, InvoiceStatus.FAILED) } returns mockk()
+        every { customerOperationsService.createTicketToOperationsForCustomerNotFound(firstInvoice.id) } just Runs
+        every { invoiceService.fetchAll() } returns listOf(firstInvoice)
+
+        val billingService = BillingService(retry, paymentProvider, invoiceService, emailService, customerOperationsService)
+
+        billingService.billClients()
+
+        verify { paymentProvider.charge(firstInvoice) }
+        verify { customerOperationsService.createTicketToOperationsForCustomerNotFound(firstInvoice.id) }
+        verify { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.FAILED) }
     }
 
     @Test
@@ -110,7 +133,7 @@ internal class BillingServiceTest {
             .ignoreExceptions(CurrencyMismatchException::class.java, CustomerNotFoundException::class.java)
             .build()
 
-        val billingService = BillingService(RetryRegistry.of(config).retry("mock"),paymentProvider, invoiceService, emailService)
+        val billingService = BillingService(RetryRegistry.of(config).retry("mock"),paymentProvider, invoiceService, emailService, customerOperationsService)
 
         billingService.billClients()
 

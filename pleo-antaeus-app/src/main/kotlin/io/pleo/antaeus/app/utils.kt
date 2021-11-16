@@ -1,8 +1,10 @@
 
+import io.pleo.antaeus.core.external.TicketingProvider
 import io.pleo.antaeus.core.external.EmailProvider
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
+import io.pleo.antaeus.models.CustomerErrorCodes
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
@@ -44,6 +46,15 @@ internal fun getPaymentProvider(): PaymentProvider {
 internal fun getEmailProvider(): EmailProvider {
     return object : EmailProvider {
         override fun emailCustomer(address: String, content: String) {
+        }
+    }
+}
+
+// This is the mocked instance of the ticketing provider
+internal fun getTicketingProvider(): TicketingProvider {
+    return object : TicketingProvider {
+        override fun openTicket(invoiceId: Int, errorCode: CustomerErrorCodes): Int {
+            return Random.nextInt()
         }
     }
 }
