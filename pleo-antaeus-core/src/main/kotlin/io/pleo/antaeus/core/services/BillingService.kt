@@ -17,18 +17,14 @@ class BillingService(
 ) {
 
     fun billClients() {
-        invoiceService.fetchAll().forEach {
-            if (it.status == InvoiceStatus.PENDING) {
-                billInvoice(it)
-            }
+        invoiceService.fetchPendingInvoices().forEach {
+            billInvoice(it)
         }
     }
 
     fun retryFailedInvoices() {
-        invoiceService.fetchAll().forEach {
-            if (it.status == InvoiceStatus.RETRYABLE_FAILED) {
-                billInvoice(it)
-            }
+        invoiceService.fetchRetryableInvoices().forEach {
+            billInvoice(it)
         }
     }
 

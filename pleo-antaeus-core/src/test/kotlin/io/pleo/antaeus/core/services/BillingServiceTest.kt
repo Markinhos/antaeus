@@ -45,9 +45,9 @@ internal class BillingServiceTest {
     @Test
     fun `given a list of invoices it should charge every invoice pending`() {
         val firstInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.PENDING)
-        val secondInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.PAID)
+        val secondInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.PENDING)
 
-        every { invoiceService.fetchAll() } returns listOf(firstInvoice, secondInvoice)
+        every { invoiceService.fetchPendingInvoices() } returns listOf(firstInvoice, secondInvoice)
         every { paymentProvider.charge(firstInvoice) } returns true
         every { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.PAID) } returns mockk()
 
@@ -56,15 +56,16 @@ internal class BillingServiceTest {
 
         verify { paymentProvider.charge(firstInvoice) }
         verify { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.PAID) }
-        verify(exactly = 0) { paymentProvider.charge(secondInvoice) }
+        verify { paymentProvider.charge(secondInvoice) }
+        verify { invoiceService.update(secondInvoice.id, secondInvoice.amount, secondInvoice.customerId, InvoiceStatus.PAID) }
+
     }
 
     @Test
     fun `given a list of invoices failed it should charge every invoice failed`() {
         val firstInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.RETRYABLE_FAILED)
-        val secondInvoice = Invoice(1, 1, Money(BigDecimal.valueOf(100), Currency.USD), InvoiceStatus.PAID)
 
-        every { invoiceService.fetchAll() } returns listOf(firstInvoice, secondInvoice)
+        every { invoiceService.fetchRetryableInvoices() } returns listOf(firstInvoice)
         every { paymentProvider.charge(firstInvoice) } returns true
         every { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.PAID) } returns mockk()
 
@@ -73,7 +74,6 @@ internal class BillingServiceTest {
 
         verify { paymentProvider.charge(firstInvoice) }
         verify { invoiceService.update(firstInvoice.id, firstInvoice.amount, firstInvoice.customerId, InvoiceStatus.PAID) }
-        verify(exactly = 0) { paymentProvider.charge(secondInvoice) }
     }
 
     @Test
@@ -85,7 +85,7 @@ internal class BillingServiceTest {
         every { paymentProvider.charge(firstInvoice) } throws CurrencyMismatchException(firstInvoice.id, firstInvoice.customerId)
         every { invoiceService.update(firstInvoice.id, money, firstInvoice.id, InvoiceStatus.RETRYABLE_FAILED) } returns mockk()
         every { emailService.emailCurrencyMismatch(firstInvoice.customerId, firstInvoice) } just Runs
-        every { invoiceService.fetchAll() } returns listOf(firstInvoice)
+        every { invoiceService.fetchPendingInvoices() } returns listOf(firstInvoice)
 
         val billingService = BillingService(retry, paymentProvider, invoiceService, emailService, customerOperationsService)
 
@@ -105,7 +105,7 @@ internal class BillingServiceTest {
         every { paymentProvider.charge(firstInvoice) } throws CustomerNotFoundException(firstInvoice.customerId)
         every { invoiceService.update(firstInvoice.id, money, firstInvoice.id, InvoiceStatus.FAILED) } returns mockk()
         every { customerOperationsService.createTicketToOperationsForCustomerNotFound(firstInvoice.id) } just Runs
-        every { invoiceService.fetchAll() } returns listOf(firstInvoice)
+        every { invoiceService.fetchPendingInvoices() } returns listOf(firstInvoice)
 
         val billingService = BillingService(retry, paymentProvider, invoiceService, emailService, customerOperationsService)
 
@@ -123,7 +123,7 @@ internal class BillingServiceTest {
         val money = Money(BigDecimal.valueOf(100), Currency.USD)
         val secondInvoice = Invoice(2, 1, money, InvoiceStatus.PENDING)
 
-        every { invoiceService.fetchAll() } returns listOf(secondInvoice)
+        every { invoiceService.fetchPendingInvoices() } returns listOf(secondInvoice)
         every { paymentProvider.charge(secondInvoice) } throws NetworkException() andThen true
         every { invoiceService.update(2, money, 1, InvoiceStatus.PAID) } returns invoice
 

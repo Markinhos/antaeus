@@ -97,3 +97,4 @@ Happy hacking 😁!
   - For NetworkException, the logical step is to retry for a few times and desist after it
   - For CurrencyMismatchException, since is an error that can be fixed by the customer, it could be sent an email and retry the next day
   - For CustomerNotFoundException, since there is no possible fix or customer to contact, it should be sent to a different table so another team can deal with those invoices.
+- Next step is just to retrieve the invoices that we are interested instead of fetching all and filtering in memory.
