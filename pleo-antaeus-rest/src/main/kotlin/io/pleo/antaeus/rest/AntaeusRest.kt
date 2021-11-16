@@ -81,7 +81,7 @@ class AntaeusRest(
                             it.json(customerService.fetch(it.pathParam("id").toInt()))
                         }
                     }
-
+                    // Convienience path to trigger billing
                     path("billing") {
                         post {
                             billingService.billClients()

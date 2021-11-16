@@ -107,5 +107,6 @@ Happy hacking 😁!
   - Set a retry counter per retryable invoice, and if reached send to customer operations.
   - Set a configurable option when to bill customers.
   - In a real production environment many of the external calls could be done in a more async way, making use of queues systems like SQS. This could be applied to email service for instance as no result is used and no sync call is needed.
+  - It can be considered to move failed payments to a different table or other type of system like queues, as querying the whole database for a few failed invoices is very inefficient.
 
 This took me about 3-4 h
